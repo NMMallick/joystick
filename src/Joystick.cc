@@ -11,69 +11,7 @@
 #include <cstring>
 #include <linux/joystick.h>
 
-#define TOTAL_CLICKS 32767.0
-#define __DEADZONE__ 0.6
-uint8_t axis_index;
-/*
- * -- AXES --
- * [0 - left joy (left/right)]
- * [1 - left joy (up/down)]
- * [2 - left trigger]
- * [3 - right joy (left/right)]
- * [4 - right joy (up/down)]
- * [5 - right trigger]
- * [6 - left pad (left/right)]
- * [7 - left pad (up/down)]
- */
-
-#define LEFT_JOY_LR 0x00
-#define LEFT_JOY_UD 0x01
-#define LEFT_TRIGGER 0x02
-#define RIGHT_JOY_LR 0x03
-#define RIGHT_JOY_UD 0x04
-#define RIGHT_TRIGGER 0x05
-#define LEFT_PAD_LR 0x06
-#define LEFT_PAD_UD 0x07
-
-#define AXIS_COUNT 8
-
-/*
- * -- BUTTONS --nn
- * [0 - A]
- * [1 - B]
- * [2 - X]
- * [3 - Y]
- * [4 - LB]
- * [5 - RB]
- * [6 - BACK]
- * [7 - START]
- * [8 - CENTER]
- * [9 - LEFT JOY]
- * [10 - RIGHT JOY]
- */
-
-#define A_BUTTON 0x00
-#define B_BUTTON 0x01
-#define X_BUTTON 0x02
-#define Y_BUTTON 0x03
-#define LEFT_BUTTON 0x04
-#define RIGHT_BUTTON 0x05
-#define BACK_BUTTON 0x06
-#define START_BUTTON 0x07
-#define CENTER_BUTTON 0x08
-#define LEFT_JOY_BUTTON 0x09
-#define RIGHT_JOY_BUTTON 0x0a
-
-#define BUTTON_COUNT 11
-
-
-/* struct for XBOX Controller */
-typedef struct xbox_ctls
-{
-    // Axes
-    float axes[AXIS_COUNT];
-    float buttons[BUTTON_COUNT];
-} xbox_ctls;
+#include <Bindings.h>
 
 /**
  * Reads a joystick event from the joystick device.
@@ -118,19 +56,19 @@ size_t get_button_count(int fd)
     return buttons;
 }
 
-size_t parse_event(struct js_event *event, xbox_ctls &ctl)
+size_t parse_event(struct js_event *event, input_ctl_t &ctl)
 {
     size_t idx = event->number;
 
     if (event->type == JS_EVENT_BUTTON)
-	ctl.buttons[idx] = event->value;
+		ctl.buttons[idx] = event->value;
 
     if (event->type == JS_EVENT_AXIS)
     {
-	float val = event->value/TOTAL_CLICKS;
+		float val = event->value/TOTAL_CLICKS;
 
-	// Dead region
-	ctl.axes[idx] = (abs(val) < __DEADZONE__) ? 0.0 : val;
+		// Dead region
+		ctl.axes[idx] = (abs(val) < __DEADZONE__) ? 0.0 : val;
     }
 
     return idx;
@@ -142,7 +80,7 @@ int main(int argc, char **argv)
     struct js_event event;
     int js;
     size_t axis;
-    xbox_ctls xb{.axes={0.0}, .buttons={0.0}};
+    input_ctl_t input{.axes={0.0}, .buttons={0.0}};
 
     // Open up the device file
     device = "/dev/input/js0";
@@ -151,7 +89,7 @@ int main(int argc, char **argv)
     if (js == -1)
     {
         perror("Could not open joystick");
-	return -1;
+		return -1;
     }
 
     // Print out the number of axes on the joystick
@@ -161,60 +99,60 @@ int main(int argc, char **argv)
     // Verify the axis count
     if (ax_count != AXIS_COUNT)
     {
-	fprintf(stderr, "Invalid axis count (%ld != %d)\n", ax_count, AXIS_COUNT);
-	return -1;
+		fprintf(stderr, "Invalid axis count (%ld != %d)\n", ax_count, AXIS_COUNT);
+		return -1;
     }
 
     // Verify the button count
     if (bt_count != BUTTON_COUNT)
     {
-	fprintf(stderr, "Invalid button count (%ld != %d)\n", bt_count, BUTTON_COUNT);
-	return -1;
+		fprintf(stderr, "Invalid button count (%ld != %d)\n", bt_count, BUTTON_COUNT);
+		return -1;
     }
 
     printf("Reading events .. \n");
 
     while (1)
     {
-	while (read(js, &event, sizeof(event)) > 0)
-	{
-	    switch (event.type)
-	    {
-            	case JS_EVENT_BUTTON:
-            	case JS_EVENT_AXIS:
-		    parse_event(&event, xb);
-		    break;
-	    	default:
-		    /* Ignore init events. */
-		    break;
-	    }
-	}
+		while (read(js, &event, sizeof(event)) > 0)
+		{
+			switch (event.type)
+			{
+			case JS_EVENT_BUTTON:
+			case JS_EVENT_AXIS:
+				parse_event(&event, input);
+				break;
+			default:
+				/* Ignore init events. */
+				break;
+			}
+		}
 
-	if (errno != EAGAIN && errno != 0)
-	{
-	    fprintf(stderr, "Error reading joystick (%d)\n", errno);
-	    fprintf(stderr, "\t%s\n", strerror(errno));
-	    break;
-	}
+		if (errno != EAGAIN && errno != 0)
+		{
+			fprintf(stderr, "Error reading joystick (%d)\n", errno);
+			fprintf(stderr, "\t%s\n", strerror(errno));
+			break;
+		}
 
-	// print buttons
-	// fprintf(stdout, "\n-----------------------------------\n");
-	// fprintf(stdout, "\Buttons:\t[");
-	// for (int i = 0; i < BUTTON_COUNT; i++)
-	// {
-	//     fprintf(stdout, " %f ", xb.buttons[i]);
-	// }
-	// fprintf(stdout, "]\r");
+		// print buttons
+		// fprintf(stdout, "\n-----------------------------------\n");
+		// fprintf(stdout, "\Buttons:\t[");
+		// for (int i = 0; i < BUTTON_COUNT; i++)
+		// {
+		//     fprintf(stdout, " %f ", xb.buttons[i]);
+		// }
+		// fprintf(stdout, "]\r");
 
-	// print axes
-	fprintf(stdout, "Axes:\t\t[");
-	for (int i = 0; i < AXIS_COUNT; i++)
-	{
-	    fprintf(stdout, " %f ", xb.axes[i]);
-	}
-	fprintf(stdout, "]\r");
+		// print axes
+		fprintf(stdout, "Axes:\t\t[");
+		for (int i = 0; i < AXIS_COUNT; i++)
+		{
+			fprintf(stdout, " %f ", input.axes[i]);
+		}
+		fprintf(stdout, "]\r");
 
-	fflush(stdout);
+		fflush(stdout);
     }
 
     close(js);
