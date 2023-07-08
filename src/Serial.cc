@@ -41,6 +41,8 @@ int main(void)
 // 	cc_t c_cc[NCCS];		/* control characters */
 // };
 
+	// ##### Control Modes #####
+
     // - PARITY BIT - NOTE check to see if we need to check
     // the parity bit on the other end of the
     // serial comm. We will disable
@@ -66,4 +68,81 @@ int main(void)
     tty.c_cflag &= ~CRTSCTS; // Disable RTS/CTS hardware flow control (most common)
     // tty.c_cflag |= CRTSCTS;  // Enable RTS/CTS hardware flow control
 
+	// - CREAD & CLOCAL -
+	// Setting CLOCAL disables modem-specific signal lines such as carrier detect. It also
+	// prevents the controlling process from getting sent a SIGHUP signal when a modem disconnect is
+	// detected, which is usually a good thing here. Setting CREAD allows us to read data (desired)
+	tty.c_cflag |= CREAD | CLOCAL; // Turn on READ & ignore ctrl lines (CLOCAL = 1)
+
+	// ###### LOCAL MODES #####
+	// - CANONICAL MODE -
+	// Setting canonical mode triggers input processing only when a new line character is recieved.
+	// This is mainly used for line-by-line editing since chars like backspace are used to edit
+	// the current line of text. This could cause bytes to go missing when sending raw data, so
+	// we will turn it off. 
+	tty.c_lflag &= ~ICANON;
+
+	// - ECHO -
+	// If this is set, sent characters are echo'd back. This may be dependent on canonical mode, i.e.
+	// when canon is disabled, echo may do nothing (would be valiant to check)
+	tty.c_lflag &= ~ECHO;// Disable echo
+	tty.c_lflag &= ~ECHOE;// Disable erasure
+	tty.c_lflag &= ~ECHONL;// Disable new line
+
+	// - Signal Characters -
+	// We disable the interpretation of signal characts (INT, QUIT, SUSP). Again, raw data only so this
+	// will be disabled
+	tty.c_lflag &= ~ISIG;
+
+	// ##### Input Modes #####
+
+
+	// - Software Flow Control -
+	// disables software flow control
+	// For now we will keep it disable but could use some more investigation into this
+	// https://en.wikipedia.org/wiki/Software_flow_control
+	tty.c_iflag &= ~(IXON | IXOFF | IXANY); // Turn off s/w flow ctrl
+
+	// - Byte Handling -
+	// Other byte handling fields. Disabling to keep the serial stream raw
+	tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL); // Disable any special handling of received bytes
+
+	// ##### Output Modes ######
+	tty.c_oflag &= ~OPOST; // Prevent special interpretation of output bytes (e.g. newline chars)
+	tty.c_oflag &= ~ONLCR; // Prevent conversion of newline to carriage return/line feed
+	// tty.c_oflag &= ~OXTABS; // Prevent conversion of tabs to spaces (NOT PRESENT IN LINUX)
+	// tty.c_oflag &= ~ONOEOT; // Prevent removal of C-d chars (0x004) in output (NOT PRESENT IN LINUX)
+
+	// ##### VMIN and VTIME #####
+	// https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/
+	// This link has nice into section on how to use VMIN and VTIME
+
+	// Wait poll 1s OR wait for 4 bytes to be ready
+	tty.c_cc[VTIME] = 10;
+	tty.c_cc[VMIN] = 4;
+
+
+	// ##### Baudrate #####
+	// in/out (respectively)
+	cfsetispeed(&tty, B115200);
+	cfsetospeed(&tty, B115200);
+
+	// ##### Save Termios #####
+	// Save tty settings and check for error
+	if (tcsetattr(serial_port, TCSANOW, &tty) != 0)
+	{
+		printf("Error %i from tcsetattr: %s\n", errnor, strerror(errno));
+	}
+
+	// Writing
+	unsigned char msg[] = { 'H', 'e', 'l', 'l', 'o' };
+	write(serial_port, msg, sizeof(msg));
+
+	// Reading
+	char rxbuf [4];
+	int n = read(serial_port, &rxbuf, sizeof(rxbuf));
+
+
+	if (n < 0)
+		fprintf(stdout, "error baby\n");
 }
