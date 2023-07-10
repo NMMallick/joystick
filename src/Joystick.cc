@@ -10,8 +10,16 @@
 #include <unistd.h>
 #include <cstring>
 #include <linux/joystick.h>
+#include <Offboard.hh>
 
-#include <Bindings.h>
+/* Struct for XBOX Controller */
+// TODO - looking to get rid of this
+typedef struct xbox_ctls
+{
+    // Axes
+    float axes[AXIS_COUNT];
+    float buttons[BUTTON_COUNT];
+} xbox_ctls;
 
 /**
  * Reads a joystick event from the joystick device.
@@ -80,8 +88,19 @@ int main(int argc, char **argv)
     struct js_event event;
     int js;
     size_t axis;
-    input_ctl_t input{.axes={0.0}, .buttons={0.0}};
 
+    xbox_ctls xb {
+		.axes={0.0},
+		.buttons={0.0}
+	};
+	
+	motor_ctls ctls {
+		.thrust = 0.0;
+		.yaw = 0.0;
+		.roll = 0.0;
+		.pitch = 0.0;
+	};
+	
     // Open up the device file
     device = "/dev/input/js0";
     js = open(device, O_NONBLOCK | O_RDONLY);
@@ -120,9 +139,9 @@ int main(int argc, char **argv)
 			{
 			case JS_EVENT_BUTTON:
 			case JS_EVENT_AXIS:
-				parse_event(&event, input);
+				parse_event(&event, xb);
 				break;
-			default:
+	    	default:
 				/* Ignore init events. */
 				break;
 			}
@@ -135,24 +154,22 @@ int main(int argc, char **argv)
 			break;
 		}
 
-		// print buttons
-		// fprintf(stdout, "\n-----------------------------------\n");
-		// fprintf(stdout, "\Buttons:\t[");
-		// for (int i = 0; i < BUTTON_COUNT; i++)
-		// {
-		//     fprintf(stdout, " %f ", xb.buttons[i]);
-		// }
-		// fprintf(stdout, "]\r");
+		// save output
+		ctls.thrust = xb.axes[THRUST_INDEX];
+		ctls.yaw = xb.axes[YAW_INDEX];
+		ctls.roll = xb.axes[ROLL_INDEX];
+		ctls.pitch = xb.axes[PITCH_INDEX];
 
+		
 		// print axes
-		fprintf(stdout, "Axes:\t\t[");
-		for (int i = 0; i < AXIS_COUNT; i++)
-		{
-			fprintf(stdout, " %f ", input.axes[i]);
-		}
-		fprintf(stdout, "]\r");
-
-		fflush(stdout);
+		// fprintf(stdout, "Axes:\t\t[");
+		// for (int i = 0; i < AXIS_COUNT; i++)
+		// {
+		// 	fprintf(stdout, " %f ", xb.axes[i]);
+		// }
+		
+		// fprintf(stdout, "]\r");
+		// fflush(stdout);
     }
 
     close(js);

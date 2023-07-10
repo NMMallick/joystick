@@ -8,8 +8,5 @@ else()
 endif()
 
 add_executable(joystick src/Joystick.cc)
+add_executable(serial src/Serial.cc)
 
-target_include_directories(joystick PRIVATE
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-  )

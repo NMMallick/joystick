@@ -1,3 +1,5 @@
+#include <time.h>
+
 // C library headers
 #include <stdio.h>
 #include <string.h>
@@ -10,7 +12,7 @@
 
 int main(void)
 {
-    int serial_port = open("/dev/ttyUSB0", O_RDWR);
+    int serial_port = open("/dev/ttyACM0", O_RDWR);
 
     // Check for errors
     if (serial_port < 0)
@@ -117,9 +119,9 @@ int main(void)
 	// https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/
 	// This link has nice into section on how to use VMIN and VTIME
 
-	// Wait poll 1s OR wait for 4 bytes to be ready
+	// Wait poll 10s OR wait for 4 bytes to be ready
 	tty.c_cc[VTIME] = 10;
-	tty.c_cc[VMIN] = 4;
+	tty.c_cc[VMIN] = 5;
 
 
 	// ##### Baudrate #####
@@ -131,18 +133,23 @@ int main(void)
 	// Save tty settings and check for error
 	if (tcsetattr(serial_port, TCSANOW, &tty) != 0)
 	{
-		printf("Error %i from tcsetattr: %s\n", errnor, strerror(errno));
+		printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
 	}
 
 	// Writing
-	unsigned char msg[] = { 'H', 'e', 'l', 'l', 'o' };
-	write(serial_port, msg, sizeof(msg));
+	unsigned char msg[] = { 'F', 'o', 'c', 'k' };
+	write(serial_port, msg, 4);
 
 	// Reading
-	char rxbuf [4];
-	int n = read(serial_port, &rxbuf, sizeof(rxbuf));
-
+	char rxbuf [4] = {0};
+	int n = read(serial_port, &rxbuf, 4);
 
 	if (n < 0)
 		fprintf(stdout, "error baby\n");
+
+	fprintf(stdout, "%s\n", rxbuf);
+	
+	printf("success!!!!\n");
+
+	close(serial_port);
 }
