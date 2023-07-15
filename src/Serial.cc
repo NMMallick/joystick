@@ -10,14 +10,78 @@
 #include <termios.h> // Contains POSIX terminal control definitions
 #include <unistd.h> // write(), read(), close()
 
-int main(void)
+// c++stdlib
+#include <iostream>
+
+// Serial header
+#include <serial/Serial.hh>
+
+// Serial.hh definitions (start)
+
+Serial::Serial(const char *port)
+{
+	// clean setup variable
+	setup &= ~0xff;
+
+	openDevFile(port);
+}
+
+Serial::~Serial()
+{
+	// If the port is opened then we close it
+	if (setup & PORT_OPENED)
+		close(serial_port_);
+}
+
+void Serial::openDevFile(const char *devFile)
+{
+	setup &= 0x00;
+	serial_port_ = open(devFile, O_RDWR);
+
+	if (serial_port_ < 0)
+	{
+		std::cerr << "open() returned with : " << strerror(errno) << std::endl;
+		return;
+	}
+
+	if (tcgetattr(serial_port_, &tty) != 0)
+	{
+		std::cerr << "tcgetattr() returned with : " << + strerror(errno) << std::endl;
+		return;
+	}
+
+	setup |= PORT_OPENED;
+}
+
+void Serial::setBaudrate(const Serial::Baudrate &br)
+{
+	// TODO: make this a bit more dynamic by independently
+	// setting the output and input baudrates. For now, set
+	// both for prototyping
+	cfsetspeed(&tty, br);
+
+	// Verify the baudrate
+	if (cfgetispeed(&tty) == br && cfgetispeed(&tty) == br)
+		setup |= BAUD_RATE_SET;
+	else
+		setup &= ~BAUD_RATE_SET;
+}
+
+bool Serial::isReady()
+{
+	return setup == PORT_READY;
+}
+
+// Serial.hh definitions (end)
+
+int outdated_main(void)
 {
     int serial_port = open("/dev/ttyACM0", O_RDWR);
 
     // Check for errors
     if (serial_port < 0)
     {
-	printf("Error %i from open: %s\n", errno, strerror(errno));
+		printf("Error %i from open: %s\n", errno, strerror(errno));
     }
 
 // Create new termios struct, we call it 'tty' for convention
@@ -31,7 +95,7 @@ int main(void)
 // is undefined
     if(tcgetattr(serial_port, &tty) != 0)
     {
-	printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
+		printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
     }
 
 // struct termios {
@@ -81,7 +145,7 @@ int main(void)
 	// Setting canonical mode triggers input processing only when a new line character is recieved.
 	// This is mainly used for line-by-line editing since chars like backspace are used to edit
 	// the current line of text. This could cause bytes to go missing when sending raw data, so
-	// we will turn it off. 
+	// we will turn it off.
 	tty.c_lflag &= ~ICANON;
 
 	// - ECHO -
@@ -97,7 +161,6 @@ int main(void)
 	tty.c_lflag &= ~ISIG;
 
 	// ##### Input Modes #####
-
 
 	// - Software Flow Control -
 	// disables software flow control
@@ -148,8 +211,10 @@ int main(void)
 		fprintf(stdout, "error baby\n");
 
 	fprintf(stdout, "%s\n", rxbuf);
-	
+
 	printf("success!!!!\n");
 
 	close(serial_port);
+	
+	return 0;
 }
