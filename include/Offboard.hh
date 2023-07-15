@@ -38,13 +38,9 @@ typedef struct motor_ctls
 
 #else
 
-#error Controller define required
+#error Controller definition required
 
 #endif
-
-
-#define TOTAL_CLICKS 32767.0
-#define __DEADZONE__ 0.6
 
 #if USE_RAW_INPUT
 uint8_t axis_index;
