@@ -1,12 +1,13 @@
 cmake_minimum_required(VERSION 3.0)
 project(Joystick VERSION 1.0)
 
-if(USE_LOGITECH)
-  add_compile_definitions(-DUSE_LOGITECH)
-else()
-  add_compile_definitions(-DUSE_XBOX)
-endif()
+set(offboard_SOURCES
+  src/Joystick.cc
+  src/Serial.cc)
 
-add_executable(joystick src/Joystick.cc)
-add_executable(serial src/Serial.cc)
+add_definitions(-DUSE_LOGITECH)
+add_executable(fc_offboard framework/offboard_framework.cc ${offboard_SOURCES})
 
+target_include_directories(fc_offboard PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
