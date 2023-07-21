@@ -39,23 +39,6 @@ Serial::Serial(const char *port)
     tty.c_cflag &= ~PARENB; // Clear parity bit, disabling parity (most common)
     // tty.c_cflag |= PARENB;  // Set parity bit, enabling parity
 
-    // Writing
-    unsigned char msg[] = { 'F', 'o', 'c', 'k' };
-    write(serial_port, msg, 4);
-
-    // Reading
-    char rxbuf [4] = {0};
-    int n = read(serial_port, &rxbuf, 4);
-
-    if (n < 0)
-	fprintf(stdout, "error baby\n");
-
-    fprintf(stdout, "%s\n", rxbuf);
-
-    printf("success!!!!\n");
-
-    close(serial_port);
-
 	// - CREAD & CLOCAL -
 	// Setting CLOCAL disables modem-specific signal lines such as carrier detect. It also
 	// prevents the controlling process from getting sent a SIGHUP signal when a modem disconnect is
