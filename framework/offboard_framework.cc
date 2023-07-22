@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 			break;
 		}
 
-		// Save output
+		// Print output
 		ss << "\n\n\tThrust: " << std::to_string(ctls.axes[THRUST_INDEX])
 		   << "\n\tRoll: " << std::to_string(ctls.axes[ROLL_INDEX])
 		   << "\n\tPitch: " << std::to_string(ctls.axes[PITCH_INDEX])
