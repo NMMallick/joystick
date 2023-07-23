@@ -86,6 +86,10 @@ std::vector<float> JoyInput::buttons()
 Joystick::Joystick(const std::string &port) :
     done(true)
 {
+    // Checking hardware concurrency since this depends on it
+    if (std::thread::hardware_concurrency() < 2)
+	throw std::runtime_error("This platform does not support hardware concurrency");
+
     fd = open(port.c_str(), O_NONBLOCK | O_RDONLY);
 
     // Check to see if we've opened the device file
@@ -97,8 +101,6 @@ Joystick::Joystick(const std::string &port) :
 
     // Initialize the input container struct
     inputs = JoyInput(get_axis_count(fd), get_button_count(fd));
-
-    std::cout << "Joystick class created" << std::endl;
 }
 
 Joystick::~Joystick()
@@ -121,7 +123,6 @@ void Joystick::start()
 		      }
 
 		      {
-			  // TODO: Read data and write it to our container object
 			  while (read(fd, &event, sizeof(event)) > 0)
 			  {
 			      switch (event.type)
