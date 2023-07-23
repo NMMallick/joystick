@@ -33,18 +33,16 @@ Serial::Serial(const char *port)
     }
 
     // ##### Control Modes #####
-    // - PARITY BIT - NOTE check to see if we need to check
-    // the parity bit on the other end of the
-    // serial comm. We will disable
-    tty.c_cflag &= ~PARENB; // Clear parity bit, disabling parity (most common)
-    // tty.c_cflag |= PARENB;  // Set parity bit, enabling parity
+    // - PARITY BIT - NOTE check to see if we need to check the parity bit on the other end of the
+    // serial comm. We will disable since this is most common and what is be used in the
+    // motivation of this class
+    tty.c_cflag &= ~PARENB;
 
     // - CREAD & CLOCAL -
     // Setting CLOCAL disables modem-specific signal lines such as carrier detect. It also
     // prevents the controlling process from getting sent a SIGHUP signal when a modem disconnect is
     // detected, which is usually a good thing here. Setting CREAD allows us to read data (desired)
-    tty.c_cflag |= CREAD | CLOCAL; // Turn on READ & ignore ctrl lines (CLOCAL = 1)
-
+    tty.c_cflag |= CREAD | CLOCAL;
     setup |= CTL_MODE_SET;
 
     // ###### LOCAL MODES #####
@@ -66,34 +64,25 @@ Serial::Serial(const char *port)
     // We disable the interpretation of signal characts (INT, QUIT, SUSP). Again, raw data only so this
     // will be disabled
     tty.c_lflag &= ~ISIG;
-
     setup |= LOCAL_MODE_SET;
 
     // ##### Input Modes #####
     // - Software Flow Control -
     // disables software flow control
-    // For now we will keep it disable but could use some more investigation into this
-    // https://en.wikipedia.org/wiki/Software_flow_control
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY); // Turn off s/w flow ctrl
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
 
     // - Byte Handling -
     // Other byte handling fields. Disabling to keep the serial stream raw
-    tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL); // Disable any special handling of received bytes
-
+    tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
     setup |= INPUT_MODE_SET;
 
     // ##### Output Modes ######
     tty.c_oflag &= ~OPOST; // Prevent special interpretation of output bytes (e.g. newline chars)
     tty.c_oflag &= ~ONLCR; // Prevent conversion of newline to carriage return/line feed
-    // tty.c_oflag &= ~OXTABS; // Prevent conversion of tabs to spaces (NOT PRESENT IN LINUX)
-    // tty.c_oflag &= ~ONOEOT; // Prevent removal of C-d chars (0x004) in output (NOT PRESENT IN LINUX)
 
     setup |= OUTPUT_MODE_SET;
 
     // ##### VMIN and VTIME #####
-    // https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/
-    // This link has nice into section on how to use VMIN and VTIME
-
     // Read any available data immediately
     tty.c_cc[VTIME] = 0;
     tty.c_cc[VMIN] = 0;
