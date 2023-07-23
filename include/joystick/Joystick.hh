@@ -6,65 +6,10 @@
 #include <thread>
 #include <utility>
 
-// Struct Definitions
-typedef struct joy_input
-{
-	joy_input(size_t a, size_t b)
-	{
-		axes.reserve(a);
-		buttons.reserve(b);
-
-		std::fill(axes.begin(), axes.end(), 0.0);
-		std::fill(buttons.begin(), buttons.end(), 0.0);
-	}
-
-	// Axes
-	std::vector<float> axes;
-	// Buttons
-	std::vector<float> buttons;
-
-} joy_input;
-
 #define TOTAL_CLICKS 32767.0
 #define __DEADZONE__ 0.6
 
-class Joystick
-{
-    using Lock = std::lock_guard<std::mutex>;
-    using Mutex = std::mutex;
-    using Pair = std::pair<std::vector, std::vector>;
-    using Input = joy_input;
-
-public:
-    // Constructor
-    Joystick(const std::string &port);
-
-    // We don't want to enable copy constructor
-    // and assignment operator since this class will
-    // be threaded and open/close devic files
-    Joystick() = delete;
-    Joystick(const Joystick &cp) = delete;
-    Joystick& operator=(const Joystick &rhs) = delete;
-
-    // Start and stop reading the joystick driver
-    void start();
-    void stop();
-
-    // Get the data
-    Pair get();
-
-protected:
-
-    Mutex data_mutex_, flag_mutex_;
-    Input inputs;
-    bool done;
-
-private:
-    std::thread thr;
-    int fd;
-    js_event event;
-
-};
+class JoyInput;
 
 /**
  * @brief Reads a joystick event from an open joystick device file
@@ -94,4 +39,64 @@ size_t get_button_count(int fd);
  * @param ctl Joystick control object which the event param is copied to
  * @returns the event
  */
-void parse_event(struct js_event *event, joy_input &input);
+void parse_event(struct js_event *event, JoyInput &input);
+
+// JoyInput Object
+class JoyInput
+{
+public:
+    // Constructor
+    JoyInput() = default;
+    JoyInput(size_t a, size_t b);
+
+    // Returns copies of the data in both vectors
+    std::vector<float> axes();
+    std::vector<float> buttons();
+
+private:
+    friend void parse_event(struct js_event *, JoyInput &);
+
+    // Axes
+    std::vector<float> axs;
+    // Buttons
+    std::vector<float> btns;
+
+};
+
+
+class Joystick
+{
+    using Lock = std::lock_guard<std::mutex>;
+    using Mutex = std::mutex;
+    using Pair = std::pair<std::vector<float>, std::vector<float>>;
+
+public:
+    // Constructor/Destructor
+    Joystick(const std::string &port);
+    ~Joystick();
+
+    // We don't want to enable copy constructor
+    // and assignment operator since this class will
+    // be threaded and open/close devic files
+    Joystick() = delete;
+    Joystick(const Joystick &cp) = delete;
+    Joystick& operator=(const Joystick &rhs) = delete;
+
+    // Start and stop reading the joystick driver
+    void start();
+    void stop();
+
+    // Get the data
+    Pair get();
+
+protected:
+    Mutex data_mutex_, flag_mutex_;
+    JoyInput inputs;
+    bool done;
+
+private:
+    std::thread thr;
+    int fd;
+    js_event event;
+
+};
