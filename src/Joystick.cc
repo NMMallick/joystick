@@ -9,15 +9,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <cstring>
+#include <iostream>
+
 #include <linux/joystick.h>
+#include <joystick/Joystick.hh>
 
-#include <Bindings.h>
-
-/**
- * Reads a joystick event from the joystick device.
- *
- * Returns 0 on success. Otherwise -1 is returned.
- */
+// joystick definitions (start)
 int read_js_event(int fd, struct js_event *event)
 {
     ssize_t bytes;
@@ -31,9 +28,6 @@ int read_js_event(int fd, struct js_event *event)
     return -1;
 }
 
-/**
- * Returns the number of axes on the controller or 0 if an error occurs.
- */
 size_t get_axis_count(int fd)
 {
     __u8 axes;
@@ -44,9 +38,6 @@ size_t get_axis_count(int fd)
     return axes;
 }
 
-/**
- * Returns the number of buttons on the controller or 0 if an error occurs.
- */
 size_t get_button_count(int fd)
 {
     __u8 buttons;
@@ -56,105 +47,134 @@ size_t get_button_count(int fd)
     return buttons;
 }
 
-size_t parse_event(struct js_event *event, input_ctl_t &ctl)
+void parse_event(struct js_event *event, JoyInput &input)
 {
     size_t idx = event->number;
 
     if (event->type == JS_EVENT_BUTTON)
-		ctl.buttons[idx] = event->value;
+	input.btns[idx] = event->value;
 
     if (event->type == JS_EVENT_AXIS)
     {
-		float val = event->value/TOTAL_CLICKS;
+	float val = event->value/TOTAL_CLICKS;
 
-		// Dead region
-		ctl.axes[idx] = (abs(val) < __DEADZONE__) ? 0.0 : val;
+	// Dead region
+	input.axs[idx] = (abs(val) < __DEADZONE__) ? 0.0 : val;
     }
-
-    return idx;
 }
+// joystick definitions (end)
 
-int main(int argc, char **argv)
+// Joystick input definitions (start)
+JoyInput::JoyInput(size_t a, size_t b)
 {
-    const char *device;
-    struct js_event event;
-    int js;
-    size_t axis;
-    input_ctl_t input{.axes={0.0}, .buttons={0.0}};
-
-    // Open up the device file
-    device = "/dev/input/js0";
-    js = open(device, O_NONBLOCK | O_RDONLY);
-
-    if (js == -1)
-    {
-        perror("Could not open joystick");
-		return -1;
-    }
-
-    // Print out the number of axes on the joystick
-    size_t ax_count = get_axis_count(js);
-    size_t bt_count = get_button_count(js);
-
-    // Verify the axis count
-    if (ax_count != AXIS_COUNT)
-    {
-		fprintf(stderr, "Invalid axis count (%ld != %d)\n", ax_count, AXIS_COUNT);
-		return -1;
-    }
-
-    // Verify the button count
-    if (bt_count != BUTTON_COUNT)
-    {
-		fprintf(stderr, "Invalid button count (%ld != %d)\n", bt_count, BUTTON_COUNT);
-		return -1;
-    }
-
-    printf("Reading events .. \n");
-
-    while (1)
-    {
-		while (read(js, &event, sizeof(event)) > 0)
-		{
-			switch (event.type)
-			{
-			case JS_EVENT_BUTTON:
-			case JS_EVENT_AXIS:
-				parse_event(&event, input);
-				break;
-			default:
-				/* Ignore init events. */
-				break;
-			}
-		}
-
-		if (errno != EAGAIN && errno != 0)
-		{
-			fprintf(stderr, "Error reading joystick (%d)\n", errno);
-			fprintf(stderr, "\t%s\n", strerror(errno));
-			break;
-		}
-
-		// print buttons
-		// fprintf(stdout, "\n-----------------------------------\n");
-		// fprintf(stdout, "\Buttons:\t[");
-		// for (int i = 0; i < BUTTON_COUNT; i++)
-		// {
-		//     fprintf(stdout, " %f ", xb.buttons[i]);
-		// }
-		// fprintf(stdout, "]\r");
-
-		// print axes
-		fprintf(stdout, "Axes:\t\t[");
-		for (int i = 0; i < AXIS_COUNT; i++)
-		{
-			fprintf(stdout, " %f ", input.axes[i]);
-		}
-		fprintf(stdout, "]\r");
-
-		fflush(stdout);
-    }
-
-    close(js);
-    return 0;
+    axs = std::vector<float>(a, 0.0);
+    btns = std::vector<float>(b, 0.0);
 }
+
+std::vector<float> JoyInput::axes()
+{
+    return std::vector<float>(axs);
+}
+
+std::vector<float> JoyInput::buttons()
+{
+    return std::vector<float>(btns);
+}
+// Joyst input definitions (end)
+
+// Joystick class definitions (start)
+Joystick::Joystick(const std::string &port) :
+    done(true)
+{
+    // Checking hardware concurrency since this depends on it
+    if (std::thread::hardware_concurrency() < 2)
+	throw std::runtime_error("This platform does not support hardware concurrency");
+
+    fd = open(port.c_str(), O_NONBLOCK | O_RDONLY);
+
+    // Check to see if we've opened the device file
+    if (fd == -1)
+    {
+	std::cerr << strerror(errno) << std::endl;
+	throw std::runtime_error("Could not open device file : " + port );
+    }
+
+    // Initialize the input container struct
+    inputs = JoyInput(get_axis_count(fd), get_button_count(fd));
+}
+
+Joystick::~Joystick()
+{
+    stop();
+}
+
+void Joystick::start()
+{
+    // Important to capture by reference since we want
+    // NO copies of this class
+    auto fn = [&]() {
+		  while(1)
+		  {
+		      // Check to see if we are being told to wrap up
+		      {
+			  Joystick::Lock lk(flag_mutex_);
+			  if (done)
+			      break;
+		      }
+
+		      {
+			  while (read(fd, &event, sizeof(event)) > 0)
+			  {
+			      switch (event.type)
+			      {
+			      case JS_EVENT_BUTTON:
+			      case JS_EVENT_AXIS:
+			      {
+				  Joystick::Lock lk(data_mutex_);
+				  parse_event(&event, inputs);
+				  break;
+			      }
+			      default:
+				  break;
+			      }
+			  }
+
+			  if (errno != EAGAIN && errno != 0)
+			  {
+			      // TODO: figure out what to do if we we have
+			      // a problem reading from the joy device
+			      break;
+			  }
+		      }
+		  }
+	      };
+
+    // Start the thread
+    thr = std::thread(std::move(fn));
+
+    // Set the flag so we know the thread is running
+    Joystick::Lock lk(flag_mutex_);
+    done = false;
+}
+
+void Joystick::stop()
+{
+    // Set the done flag to true so the threads
+    // knows to stop
+    {
+	Joystick::Lock lk(flag_mutex_);
+	if (!done)
+	    done = true;
+    }
+
+    // Wait for the thread to join
+    if (thr.joinable())
+	thr.join();
+}
+
+Joystick::Pair Joystick::get()
+{
+    Joystick::Lock lk(data_mutex_);
+    return std::make_pair(inputs.axes(), inputs.buttons());
+}
+// Joystick class definitions (end)
