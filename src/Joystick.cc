@@ -45,22 +45,55 @@ void Joystick::start()
 				       break;
 			       }
 
-			       // TODO: Read data and write it to our container class
+			       {
+				   // TODO: Read data and write it to our container object
+				   while (read(fd, &event, sizeof(event)) > 0)
+				   {
+				       switch (event.type)
+				       {
+				       case JS_EVENT_BUTTON:
+				       case JS_EVENT_AXIS:
+					   Joystick::Lock lk(data_mutex_);
+					   parse_event(&event, input);
+					   break;
+				       default:
+					   break;
+				       }
+				   }
 
+				   if (errno != EAGAIN && errno != 0)
+				   {
+				       // TODO: figure out what to do if we we have
+				       // a problem reading from the joy device
+				       break;
+				   }
+			       }
 			   }
 		       });
+
+    // Set the flag so we know the thread is running
+    Joystick::Lock lk(flag_mutex_);
+    done = false;
 }
 
 void Joystick::stop()
 {
+    // Set the done flag to true so the threads
+    // knows to stop
+    {
+	Joystick::Lock lk(flag_mutex_);
+	done = true;
+    }
 
+    // Wait for the thread to join
+    thr.join();
 }
 
 Joystick::Pair get()
 {
-
+    Joystick::Lock lk(data_mutex_);
+    return std::make_pair(input.axes, input.buttons);
 }
-
 // Joystick class definitions (end)
 
 // joystick definitions (start)
