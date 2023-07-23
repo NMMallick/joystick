@@ -10,61 +10,34 @@
 
 #include <iostream>
 #include <sstream>
+#include <chrono>
 
 int main(int argc, char **argv)
 {
 
-	// Open up the joystick device file
-	const char *device = "/dev/input/js0";
-	int js = open(device, O_NONBLOCK | O_RDONLY);
+    Joystick js("/dev/input/js0");
+    std::stringstream ss;
 
-	struct js_event event;
+    js.start();
 
-	// get size n shit
-	const auto aSize = get_axis_count(js);
-	const auto bSize = get_button_count(js);
+    while (1)
+    {
 
-	auto ctls = joy_ctls(aSize, bSize);
+    	const auto data = js.get();
+    	const auto axes = data.first;
+    	const auto buttons = data.second;
 
-	// Verify that bad things aren't happening
-	if (js == -1)
-	{
-		perror("Could not open joystick");
-	}
+    	// Print output
+    	ss << "\n\n\tThrust: " << std::to_string(axes[THRUST_INDEX])
+    	   << "\n\tRoll: " << std::to_string(axes[ROLL_INDEX])
+    	   << "\n\tPitch: " << std::to_string(axes[PITCH_INDEX])
+    	   << "\n\tYaw: " << std::to_string(axes[YAW_INDEX]);
 
-	std::stringstream ss;
+    	std::cout << ss.str();
+    	ss.str(std::string());
 
-	while(1)
-	{
-		while (read(js, &event, sizeof(event)) > 0)
-		{
-			switch (event.type)
-			{
-			case JS_EVENT_BUTTON:
-			case JS_EVENT_AXIS:
-				parse_event(&event, ctls);
-				break;
-			default:
-				break;
-			}
-		}
+    }
 
-		if (errno != EAGAIN && errno != 0)
-		{
-			fprintf(stderr, "Error reading joystick (%d)\n", errno);
-			fprintf(stderr, "\t%s\n", strerror(errno));
-			break;
-		}
-
-		// Print output
-		ss << "\n\n\tThrust: " << std::to_string(ctls.axes[THRUST_INDEX])
-		   << "\n\tRoll: " << std::to_string(ctls.axes[ROLL_INDEX])
-		   << "\n\tPitch: " << std::to_string(ctls.axes[PITCH_INDEX])
-		   << "\n\tYaw: " << std::to_string(ctls.axes[YAW_INDEX]);
-
-		std::cout << ss.str();
-		ss.str(std::string());
-	}
-
-	return 0;
+    js.stop();
+    return 0;
 }
