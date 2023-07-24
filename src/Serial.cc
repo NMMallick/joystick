@@ -1,3 +1,4 @@
+
 #include <time.h>
 
 // C library headers
@@ -26,17 +27,27 @@ Serial::Serial(const char *port)
 
     openDevFile(port);
 
-    if (setup &= PORT_OPENED)
-    {
-	std::cerr << "Serial(): can't open serial port" << std::endl;
-	return;
-    }
+    if (!(setup & PORT_OPENED))
+	throw std::runtime_error("Serial(): cannot open serial port");
 
     // ##### Control Modes #####
     // - PARITY BIT - NOTE check to see if we need to check the parity bit on the other end of the
     // serial comm. We will disable since this is most common and what is be used in the
     // motivation of this class
     tty.c_cflag &= ~PARENB;
+
+    // - STOP BIT -
+    // Use only one stop bit in comms
+    tty.c_cflag &= ~CSTOPB;
+
+    // - NUM BITS/BYTE -
+    // Set the number of bits per byte (most common - 8)
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8;
+
+    // - HARDWARE FLOW CONTROL -
+    // Disable RST/CTS hardware flow control
+    tty.c_cflag &= ~CRTSCTS;
 
     // - CREAD & CLOCAL -
     // Setting CLOCAL disables modem-specific signal lines such as carrier detect. It also
@@ -105,8 +116,7 @@ Serial::~Serial()
 
 void Serial::openDevFile(const char *devFile)
 {
-    setup &= 0x00;
-    serial_port_ = open(devFile, O_RDWR);
+    serial_port_ = ::open(devFile, O_RDWR);
 
     if (serial_port_ < 0)
     {
@@ -152,7 +162,7 @@ void Serial::setBaudrate(const Serial::Baudrate &br)
 
 bool Serial::isReady()
 {
-    return setup == PORT_READY;
+    return (setup & PORT_READY) == PORT_READY;
 }
 
 void Serial::read(uint8_t *buf, size_t len, float timeOut)
@@ -177,36 +187,16 @@ void Serial::read(uint8_t *buf, size_t len, float timeOut)
     }
 }
 
-// Serial.hh definitions (end)
-
-int outdated_main(void)
+void Serial::write(uint8_t *buf, size_t len)
 {
+    if (!isReady())
+	return;
 
-
-// struct termios {
-// 	tcflag_t c_iflag;		/* input mode flags */
-// 	tcflag_t c_oflag;		/* output mode flags */
-// 	tcflag_t c_cflag;		/* control mode flags */
-// 	tcflag_t c_lflag;		/* local mode flags */
-// 	cc_t c_line;			/* line discipline */
-// 	cc_t c_cc[NCCS];		/* control characters */
-// };
-
-
-    // // Writing
-    // unsigned char msg[] = { 'F', 'o', 'c', 'k' };
-    // write(serial_port, msg, 4);
-
-    // // Reading
-    // char rxbuf [4] = {0};
-    // if (n < 0)
-    // 	fprintf(stdout, "error baby\n");
-
-    // fprintf(stdout, "%s\n", rxbuf);
-
-    // printf("success!!!!\n");
-
-    // close(serial_port);
-
-    return 0;
+    size_t n = 0;
+    while (n < len)
+    {
+	n = ::write(serial_port_, buf + n, len - n);
+    }
 }
+
+// Serial.hh definitions (end)
