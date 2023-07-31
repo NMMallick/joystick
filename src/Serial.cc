@@ -116,7 +116,7 @@ Serial::~Serial()
 
 void Serial::openDevFile(const char *devFile)
 {
-    serial_port_ = ::open(devFile, O_RDWR);
+    serial_port_ = ::open(devFile, O_RDWR | O_NOCTTY | O_NONBLOCK);
 
     if (serial_port_ < 0)
     {
@@ -165,38 +165,45 @@ bool Serial::isReady()
     return (setup & PORT_READY) == PORT_READY;
 }
 
-void Serial::read(uint8_t *buf, size_t len, float timeOut)
+size_t Serial::read(void *buf, size_t len, float timeOut)
 {
+    if (!isReady())
+	return -1;
+
     using namespace std::chrono;
     size_t bytes_read = 0;
 
     auto start = steady_clock::now();
-    auto end = steady_clock::now();
-    duration<float> elapsed_time = end - start;
+    duration<float> elapsed_time;
 
-    while ((bytes_read != len) || (elapsed_time.count() > timeOut))
+    while ((bytes_read != len) && (elapsed_time.count() < timeOut))
     {
-	int n = ::read(serial_port_, buf, len);
-	if (n != 0)
-	{
-	    bytes_read+=n;
-	    start = steady_clock::now();
-	}
+    	int n = ::read(serial_port_, buf, len);
+    	if (n != 0)
+    	{
+    	    bytes_read+=n;
+    	    start = steady_clock::now();
+    	}
 
-	end = steady_clock::now();
+    	elapsed_time = steady_clock::now() - start;
     }
+
+    return bytes_read;
 }
 
-void Serial::write(uint8_t *buf, size_t len)
+size_t Serial::write(void *buf, size_t len)
 {
     if (!isReady())
-	return;
+	return -1;
 
     size_t n = 0;
+
     while (n < len)
     {
-	n = ::write(serial_port_, buf + n, len - n);
+	n += ::write(serial_port_, buf + n, len - n);
     }
+
+    return n;
 }
 
 // Serial.hh definitions (end)

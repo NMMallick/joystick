@@ -39,10 +39,10 @@ public:
     void setBaudrate(const Serial::Baudrate &br);
 
     // Read
-    void read(uint8_t *buf, size_t len, float timeout=0);
+    size_t read(void *buf, size_t len, float timeout=3);
 
     // Writes
-    void write(uint8_t *buf, size_t len);
+    size_t write(void *buf, size_t len);
 
     // Helpers
     bool isReady();
