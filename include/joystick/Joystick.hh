@@ -85,6 +85,7 @@ public:
     // Start and stop reading the joystick driver
     void start();
     void stop();
+    void close();
 
     // Get the data
     Pair get();

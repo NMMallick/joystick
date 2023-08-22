@@ -10,22 +10,64 @@
 #include <string.h>
 
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <chrono>
+#include <csignal>
+
+// So the signal handler can reach it
+Joystick *jsPtr;
+Serial *sPtr;
+
+void handler(int signum)
+{
+    jsPtr->close();
+    sPtr->close();
+
+    exit(signum);
+}
 
 int main(int argc, char **argv)
 {
-
     Joystick js("/dev/input/js0");
     Serial s("/dev/ttyACM0");
-    std::stringstream ss;
 
-    s.setBaudrate(Serial::Baudrate::B_115200);
+    // Set these pointers so the signal handler can find them
+    sPtr = &s;
+    jsPtr = &js;
+
+    signal(SIGINT, handler);
+
+    // s.setBaudrate(115200);
     js.start();
 
     motor_ctls ctls;
+    uint8_t RX_BUF[sizeof(motor_ctls)] = {0};
 
-    uint8_t RX_BUF[sizeof(motor_ctls)];
+    auto printdata = [] (const motor_ctls &input)
+		     {
+			 std::stringstream ss;
+			 ss << "\n\n\tThrust: " << std::to_string(input.thrust)
+			    << "\n\tRoll: " << std::to_string(input.roll)
+			    << "\n\tPitch: " << std::to_string(input.pitch)
+			    << "\n\tYaw: " << std::to_string(input.yaw);
+			 std::cout << ss.str() << std::endl;
+			 ss.str(std::string{});
+		     };
+    auto printhex = [] (const uint8_t *buf, const size_t size)
+		    {
+			std::stringstream ss;
+			ss << std::hex;
+			for (size_t i = 0; i < size; i++)
+			{
+			    if (i % 4 == 0 && i != 0)
+				ss << std::endl << std::setw(2) << std::setfill('0') << (int) buf[i] << " ";
+			    else
+				ss << std::setw(2) << std::setfill('0') << (int) buf[i] << " ";
+			}
+
+			std::cout << ss.str() << std::endl;
+		    };
 
     while (1)
     {
@@ -38,19 +80,20 @@ int main(int argc, char **argv)
     	ctls.yaw = axes[YAW_INDEX];
 
     	// Write
-    	s.write((void *) &ctls, sizeof(motor_ctls));
-    	ss << "\n\n\tThrust: " << std::to_string(ctls.thrust)
-    	   << "\n\tRoll: " << std::to_string(ctls.roll)
-    	   << "\n\tPitch: " << std::to_string(ctls.pitch)
-    	   << "\n\tYaw: " << std::to_string(ctls.yaw);
-    	std::cout << ss.str() << std::endl;
-    	ss.str(std::string{});
+    	s.write(reinterpret_cast<uint8_t*>(&ctls), sizeof(RX_BUF));
 
     	// Read
-    	auto ret = s.read((void *) &RX_BUF, sizeof(motor_ctls));
+    	auto ret = s.read((uint8_t *) &RX_BUF, sizeof(RX_BUF));
 
-	if (ret != sizeof(motor_ctls))
-	    std::cout << "read(): returned with " << ret << " bytes."  << std::endl;
+	if (ret != sizeof(RX_BUF))
+	{
+	    std::cout << "did not get enough data back" << std::endl;
+	    continue;
+	}
+
+	const auto res = reinterpret_cast<const motor_ctls *>(&RX_BUF);
+	printdata(*res);
+
     }
 
     js.stop();

@@ -7,15 +7,8 @@ class Serial
 {
 
 public:
-    // Only support 3 rates for now
-    enum class Baudrate
-    {
-	B_4800 = B4800,
-	B_9600 = B9600,
-	B_115200 = B115200
-    };
 
-    Serial(const char *port);
+    Serial(const char *port, unsigned long baudrate=115200);
     ~Serial();
 
     // Don't want to make copy of any instance since
@@ -36,20 +29,23 @@ public:
     void setOutputModes(const unsigned &flags);
 
     // Set baud rate
-    void setBaudrate(const Serial::Baudrate &br);
+    void setBaudrate(unsigned long br);
 
     // Read
-    size_t read(void *buf, size_t len, float timeout=3);
+    size_t read(uint8_t *buf, size_t len, float timeout=10);
 
     // Writes
-    size_t write(void *buf, size_t len);
+    size_t write(uint8_t *buf, size_t len);
 
     // Helpers
     bool isReady();
 
+    // Close
+    void close();
+
 private:
     // open a device file
-    void openDevFile(const char *devFile);
+    void open(const char *devFile);
 
     int serial_port_;
 
