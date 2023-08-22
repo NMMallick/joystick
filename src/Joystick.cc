@@ -105,7 +105,15 @@ Joystick::Joystick(const std::string &port) :
 
 Joystick::~Joystick()
 {
+    close();
+}
+
+void Joystick::close()
+{
     stop();
+
+    if (fd)
+	::close(fd);
 }
 
 void Joystick::start()

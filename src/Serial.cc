@@ -1,3 +1,4 @@
+
 #include <time.h>
 
 // C library headers
@@ -19,24 +20,34 @@
 
 // Serial.hh definitions (start)
 
-Serial::Serial(const char *port)
+Serial::Serial(const char *port, unsigned long baudrate)
 {
     // clean setup variable
     setup &= ~0xff;
 
-    openDevFile(port);
+    open(port);
 
-    if (setup &= PORT_OPENED)
-    {
-	std::cerr << "Serial(): can't open serial port" << std::endl;
-	return;
-    }
+    if (!(setup & PORT_OPENED))
+	throw std::runtime_error("Serial(): cannot open serial port");
 
     // ##### Control Modes #####
     // - PARITY BIT - NOTE check to see if we need to check the parity bit on the other end of the
     // serial comm. We will disable since this is most common and what is be used in the
     // motivation of this class
-    tty.c_cflag &= ~PARENB;
+    tty.c_cflag &= ~(PARENB | PARODD);
+
+    // - STOP BIT -
+    // Use only one stop bit in comms
+    tty.c_cflag &= ~CSTOPB;
+
+    // - NUM BITS/BYTE -
+    // Set the number of bits per byte (most common - 8)
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8;
+
+    // - HARDWARE FLOW CONTROL -
+    // Disable RST/CTS hardware flow control
+    tty.c_cflag &= ~CRTSCTS;
 
     // - CREAD & CLOCAL -
     // Setting CLOCAL disables modem-specific signal lines such as carrier detect. It also
@@ -59,6 +70,8 @@ Serial::Serial(const char *port)
     tty.c_lflag &= ~ECHO;// Disable echo
     tty.c_lflag &= ~ECHOE;// Disable erasure
     tty.c_lflag &= ~ECHONL;// Disable new line
+    tty.c_lflag &= ~ECHOK;
+    tty.c_lflag &= ~IEXTEN;
 
     // - Signal Characters -
     // We disable the interpretation of signal characts (INT, QUIT, SUSP). Again, raw data only so this
@@ -73,7 +86,7 @@ Serial::Serial(const char *port)
 
     // - Byte Handling -
     // Other byte handling fields. Disabling to keep the serial stream raw
-    tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
+    tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|INPCK);
     setup |= INPUT_MODE_SET;
 
     // ##### Output Modes ######
@@ -81,6 +94,8 @@ Serial::Serial(const char *port)
     tty.c_oflag &= ~ONLCR; // Prevent conversion of newline to carriage return/line feed
 
     setup |= OUTPUT_MODE_SET;
+
+    setBaudrate(baudrate);
 
     // ##### VMIN and VTIME #####
     // Read any available data immediately
@@ -90,7 +105,7 @@ Serial::Serial(const char *port)
 
     // ##### Save Termios #####
     // Save tty settings and check for error
-    if (tcsetattr(serial_port_, TCSANOW, &tty) != 0)
+    if (::tcsetattr(serial_port_, TCSANOW, &tty) != 0)
     {
 	printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
     }
@@ -98,15 +113,12 @@ Serial::Serial(const char *port)
 
 Serial::~Serial()
 {
-    // If the port is opened then we close it
-    if (setup & PORT_OPENED)
-	close(serial_port_);
+    close();
 }
 
-void Serial::openDevFile(const char *devFile)
+void Serial::open(const char *devFile)
 {
-    setup &= 0x00;
-    serial_port_ = open(devFile, O_RDWR);
+    serial_port_ = ::open(devFile, O_RDWR | O_NOCTTY | O_NONBLOCK);
 
     if (serial_port_ < 0)
     {
@@ -134,13 +146,31 @@ void Serial::openDevFile(const char *devFile)
     setup |= PORT_OPENED;
 }
 
-void Serial::setBaudrate(const Serial::Baudrate &br)
+void Serial::close()
 {
-    // TODO: make this a bit more dynamic by independently
-    // setting the output and input baudrates. For now, set
-    // both for prototyping
-    const auto baudrate = static_cast<unsigned>(br);
-    cfsetspeed(&tty, baudrate);
+    // If the port is opened then we close it
+    if (setup & PORT_OPENED)
+	::close(serial_port_);
+}
+
+void Serial::setBaudrate(unsigned long baudrate)
+{
+
+    // TODO: Add more baudrates to support
+    switch (baudrate)
+    {
+    case 9600:
+	baudrate = 9600;
+	break;
+    case 115200:
+	baudrate = B115200;
+	break;
+    default:
+        throw std::runtime_error("Unsupported baudrate type");
+	break;
+    }
+
+    ::cfsetspeed(&tty, baudrate);
 
     // Verify the baudrate
     if (cfgetispeed(&tty) == baudrate
@@ -152,61 +182,48 @@ void Serial::setBaudrate(const Serial::Baudrate &br)
 
 bool Serial::isReady()
 {
-    return setup == PORT_READY;
+    return (setup & PORT_READY) == PORT_READY;
 }
 
-void Serial::read(uint8_t *buf, size_t len, float timeOut)
+size_t Serial::read(uint8_t *buf, size_t len, float timeOut)
 {
+    if (!isReady())
+	return -1;
+
     using namespace std::chrono;
     size_t bytes_read = 0;
 
     auto start = steady_clock::now();
-    auto end = steady_clock::now();
-    duration<float> elapsed_time = end - start;
+    duration<float> elapsed_time;
 
-    while ((bytes_read != len) || (elapsed_time.count() > timeOut))
+    while ((bytes_read != len) && (elapsed_time.count() < timeOut))
     {
-	int n = ::read(serial_port_, buf, len);
-	if (n != 0)
-	{
-	    bytes_read+=n;
-	    start = steady_clock::now();
-	}
+    	int n = ::read(serial_port_, buf + bytes_read, len - bytes_read);
+    	if (n != 0)
+    	{
+    	    bytes_read+=n;
+    	    start = steady_clock::now();
+    	}
 
-	end = steady_clock::now();
+    	elapsed_time = steady_clock::now() - start;
     }
+
+    return bytes_read;
+}
+
+size_t Serial::write(uint8_t *buf, size_t len)
+{
+    if (!isReady())
+	return -1;
+
+    size_t n = 0;
+
+    while (n < len)
+    {
+	n += ::write(serial_port_, buf + n, len - n);
+    }
+
+    return n;
 }
 
 // Serial.hh definitions (end)
-
-int outdated_main(void)
-{
-
-
-// struct termios {
-// 	tcflag_t c_iflag;		/* input mode flags */
-// 	tcflag_t c_oflag;		/* output mode flags */
-// 	tcflag_t c_cflag;		/* control mode flags */
-// 	tcflag_t c_lflag;		/* local mode flags */
-// 	cc_t c_line;			/* line discipline */
-// 	cc_t c_cc[NCCS];		/* control characters */
-// };
-
-
-    // // Writing
-    // unsigned char msg[] = { 'F', 'o', 'c', 'k' };
-    // write(serial_port, msg, 4);
-
-    // // Reading
-    // char rxbuf [4] = {0};
-    // if (n < 0)
-    // 	fprintf(stdout, "error baby\n");
-
-    // fprintf(stdout, "%s\n", rxbuf);
-
-    // printf("success!!!!\n");
-
-    // close(serial_port);
-
-    return 0;
-}
