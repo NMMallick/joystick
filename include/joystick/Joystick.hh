@@ -7,7 +7,7 @@
 #include <utility>
 
 #define TOTAL_CLICKS 32767.0
-#define __DEADZONE__ 0.6
+#define __DEADZONE__ 800
 
 class JoyInput;
 
@@ -53,6 +53,10 @@ public:
     std::vector<float> axes();
     std::vector<float> buttons();
 
+    // Sets the values of the buffers
+    void setAxis(const unsigned long &index, const float &value);
+    void setButton(const unsigned long &index, const float &value);
+
 private:
     friend void parse_event(struct js_event *, JoyInput &);
 
@@ -77,7 +81,7 @@ public:
 
     // We don't want to enable copy constructor
     // and assignment operator since this class will
-    // be threaded and open/close devic files
+    // be threaded and open/close device files
     Joystick() = delete;
     Joystick(const Joystick &cp) = delete;
     Joystick& operator=(const Joystick &rhs) = delete;
@@ -89,6 +93,16 @@ public:
 
     // Get the data
     Pair get();
+
+    void setAxisValue(const unsigned long &index, const float &value)
+    {
+	inputs.setAxis(index, value);
+    }
+
+    void setButtonValue(const unsigned long &index, const float &value)
+    {
+	inputs.setButton(index, value);
+    }
 
 protected:
     Mutex data_mutex_, flag_mutex_;

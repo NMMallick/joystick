@@ -7,17 +7,18 @@
 
 // Struct to translate YAW, PITCH, ROLL, THRUST
 // from manual input
-typedef struct motor_ctls
+typedef struct MotorCtls
 {
 	float thrust,
 		  yaw,
 		  roll,
 		  pitch;
-} motor_ctls;
+} MotorCtls;
 
 #if USE_LOGITECH
 
-#define YAW_INDEX 0
+#define YAW_CCW_INDEX 2
+#define YAW_CW_INDEX 5
 #define THRUST_INDEX 1
 #define ROLL_INDEX 3
 #define PITCH_INDEX 4

@@ -52,14 +52,17 @@ void parse_event(struct js_event *event, JoyInput &input)
     size_t idx = event->number;
 
     if (event->type == JS_EVENT_BUTTON)
+    {
 	input.btns[idx] = event->value;
+	return;
+    }
 
     if (event->type == JS_EVENT_AXIS)
     {
-	float val = event->value/TOTAL_CLICKS;
+	event->value = (abs(event->value) < __DEADZONE__) ? 0 : event->value;
 
 	// Dead region
-	input.axs[idx] = (abs(val) < __DEADZONE__) ? 0.0 : val;
+	input.axs[idx] = event->value/TOTAL_CLICKS;
     }
 }
 // joystick definitions (end)
@@ -80,6 +83,17 @@ std::vector<float> JoyInput::buttons()
 {
     return std::vector<float>(btns);
 }
+
+void JoyInput::setAxis(const unsigned long &index, const float &value)
+{
+    axs[index] = value;
+}
+
+void JoyInput::setButton(const unsigned long &index, const float &value)
+{
+    btns[index] = value;
+}
+
 // Joyst input definitions (end)
 
 // Joystick class definitions (start)
