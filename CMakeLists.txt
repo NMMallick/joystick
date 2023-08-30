@@ -15,3 +15,8 @@ target_include_directories(fc_offboard PUBLIC
   $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(fc_offboard serial::serial Threads::Threads)
+
+install(TARGETS serial
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  )
