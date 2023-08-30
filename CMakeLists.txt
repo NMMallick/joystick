@@ -16,7 +16,7 @@ target_include_directories(fc_offboard PUBLIC
 
 target_link_libraries(fc_offboard serial::serial Threads::Threads)
 
-install(TARGETS serial
+install(TARGETS fc_offboard
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
   )
