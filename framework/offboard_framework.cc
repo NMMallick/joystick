@@ -75,9 +75,9 @@ int main(int argc, char **argv)
     	const auto data = js.get();
     	const auto axes = data.first;
 
-    	ctls.thrust = axes[THRUST_INDEX];
+    	ctls.thrust = -(axes[THRUST_INDEX]-1)/2.;
     	ctls.roll = axes[ROLL_INDEX];
-    	ctls.pitch = axes[PITCH_INDEX];
+    	ctls.pitch = -axes[PITCH_INDEX];
     	ctls.yaw = (axes[YAW_CCW_INDEX] - axes[YAW_CW_INDEX])/2.;
 
 	buffer->setData(ctls);
