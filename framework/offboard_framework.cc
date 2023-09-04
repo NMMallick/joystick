@@ -56,6 +56,8 @@ int main(int argc, char **argv)
     Joystick js("/dev/input/js0");
     serial::Serial s("/dev/ttyACM0");
     const auto buffer = serial::create_buffer<MotorCtls>();
+    bool armed = false,
+	prev = false;
 
     // Set these pointers so the signal handler can find them
     sPtr = &s;
@@ -72,30 +74,63 @@ int main(int argc, char **argv)
 
     while (1)
     {
-    	const auto data = js.get();
-    	const auto axes = data.first;
+	auto data = js.get();
+	armed = !prev & data.second[BUTTON_A];
 
-    	ctls.thrust = -(axes[THRUST_INDEX]-1)/2.;
-    	ctls.roll = axes[ROLL_INDEX];
-    	ctls.pitch = -axes[PITCH_INDEX];
-    	ctls.yaw = (axes[YAW_CCW_INDEX] - axes[YAW_CW_INDEX])/2.;
-
-	buffer->setData(ctls);
-
-    	// Write
-	s.write(buffer.get());
-
-    	// Read
-	auto ret = s.read(buffer.get());
-
-	if (ret != buffer->size())
+	if (armed)
 	{
-	    std::cout << "did not get enough data back" << std::endl;
-	    continue;
-	}
+	    std::cout << "armed" << std::endl;
+	    prev = true;
+	    // Wait for the arming button to go back low
+	    // before using it to trigger disarm
+	    while (armed)
+	    {
+		data = js.get();
+		const auto axes = data.first;
 
-	const auto res = buffer->getData();
-	printdata(res);
+		ctls.thrust =
+		    -axes[THRUST_INDEX] >= 0 ? (0.8*-axes[THRUST_INDEX] + 0.2) : (0.2*-axes[THRUST_INDEX] + 0.2);
+		ctls.roll = axes[ROLL_INDEX];
+		ctls.pitch = -axes[PITCH_INDEX];
+		ctls.yaw = (axes[YAW_CCW_INDEX] - axes[YAW_CW_INDEX])/2.;
+
+		buffer->setData(ctls);
+
+		// Write
+		s.write(buffer.get());
+
+		// Read
+		auto ret = s.read(buffer.get());
+
+		if (ret != buffer->size())
+		{
+		    std::cout << "did not get enough data back" << std::endl;
+		    continue;
+		}
+
+		const auto res = buffer->getData();
+		printdata(res);
+
+		if (!prev & data.second[BUTTON_A])
+		    armed = false;
+		else
+		    prev = data.second[BUTTON_A];
+	    }
+
+	    // Send 0'd commands to FC
+	    ctls.thrust = 0.0;
+	    ctls.yaw = 0.0;
+	    ctls.pitch = 0.0;
+	    ctls.roll = 0.0;
+
+	    buffer->setData(ctls);
+	    s.write(buffer.get());
+
+	    prev = true;
+	    std::cout << "un-armed" << std::endl;
+	}
+	else
+	    prev = data.second[BUTTON_A];
     }
 
     js.stop();

@@ -23,6 +23,8 @@ typedef struct MotorCtls
 #define ROLL_INDEX 3
 #define PITCH_INDEX 4
 
+#define BUTTON_A 0
+
 #elif USE_XBOX_WIRED
 
 #define YAW_INDEX 0
