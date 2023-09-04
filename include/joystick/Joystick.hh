@@ -51,7 +51,7 @@ public:
 
     // Returns copies of the data in both vectors
     std::vector<float> axes();
-    std::vector<float> buttons();
+    std::vector<bool> buttons();
 
     // Sets the values of the buffers
     void setAxis(const unsigned long &index, const float &value);
@@ -63,7 +63,7 @@ private:
     // Axes
     std::vector<float> axs;
     // Buttons
-    std::vector<float> btns;
+    std::vector<bool> btns;
 
 };
 
@@ -72,7 +72,7 @@ class Joystick
 {
     using Lock = std::lock_guard<std::mutex>;
     using Mutex = std::mutex;
-    using Pair = std::pair<std::vector<float>, std::vector<float>>;
+    using Pair = std::pair<std::vector<float>, std::vector<bool>>;
 
 public:
     // Constructor/Destructor
@@ -94,12 +94,12 @@ public:
     // Get the data
     Pair get();
 
-    void setAxisValue(const unsigned long &index, const float &value)
+    void setAxisValue(const unsigned long &index, const bool &value)
     {
 	inputs.setAxis(index, value);
     }
 
-    void setButtonValue(const unsigned long &index, const float &value)
+    void setButtonValue(const unsigned long &index, const bool &value)
     {
 	inputs.setButton(index, value);
     }
