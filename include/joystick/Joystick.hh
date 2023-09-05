@@ -55,7 +55,7 @@ public:
 
     // Sets the values of the buffers
     void setAxis(const unsigned long &index, const float &value);
-    void setButton(const unsigned long &index, const float &value);
+    void setButton(const unsigned long &index, const bool &value);
 
 private:
     friend void parse_event(struct js_event *, JoyInput &);
@@ -94,13 +94,15 @@ public:
     // Get the data
     Pair get();
 
-    void setAxisValue(const unsigned long &index, const bool &value)
+    void setAxisValue(const unsigned long &index, const float &value)
     {
+	Lock lk(data_mutex_);
 	inputs.setAxis(index, value);
     }
 
     void setButtonValue(const unsigned long &index, const bool &value)
     {
+	Lock lk(data_mutex_);
 	inputs.setButton(index, value);
     }
 

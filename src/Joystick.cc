@@ -90,7 +90,7 @@ void JoyInput::setAxis(const unsigned long &index, const float &value)
     axs[index] = value;
 }
 
-void JoyInput::setButton(const unsigned long &index, const float &value)
+void JoyInput::setButton(const unsigned long &index, const bool &value)
 {
     btns[index] = value;
 }
