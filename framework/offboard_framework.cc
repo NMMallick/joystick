@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 		ctls.thrust =
 		    -axes[THRUST_INDEX] >= 0 ? (0.8*-axes[THRUST_INDEX] + 0.2) : (0.2*-axes[THRUST_INDEX] + 0.2);
 		ctls.roll = axes[ROLL_INDEX];
-		ctls.pitch = -axes[PITCH_INDEX];
+		ctls.pitch = axes[PITCH_INDEX];
 		ctls.yaw = (axes[YAW_CCW_INDEX] - axes[YAW_CW_INDEX])/2.;
 
 		buffer->setData(ctls);
